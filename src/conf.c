@@ -107,6 +107,7 @@ typedef enum {
     oAuthServSSLPort,
     oAuthServHTTPPort,
     oAuthServPath,
+	oAuthServConnectTimeout,
     oAuthServLoginScriptPathFragment,
     oAuthServPortalScriptPathFragment,
     oAuthServMsgScriptPathFragment,
@@ -146,6 +147,7 @@ typedef enum {
 	oTrustedIpList,
 	oNoAuth,
 	oGatewayHttpsPort,
+	oWorkMode,
 	// <<< liudf added end
 } OpCodes;
 
@@ -179,6 +181,7 @@ static const struct {
     "sslport", oAuthServSSLPort}, {
     "httpport", oAuthServHTTPPort}, {
     "path", oAuthServPath}, {
+	"connectTimeout", oAuthServConnectTimeout}, {
     "loginscriptpathfragment", oAuthServLoginScriptPathFragment}, {
     "portalscriptpathfragment", oAuthServPortalScriptPathFragment}, {
     "msgscriptpathfragment", oAuthServMsgScriptPathFragment}, {
@@ -208,6 +211,7 @@ static const struct {
 	"trustedIpList", oTrustedIpList}, {
 	"noAuth", oNoAuth}, {
 	"gatewayHttpsPort", oGatewayHttpsPort}, {
+	"workMode", oWorkMode}, {
 	// <<<< liudf added end
 NULL, oBadOption},};
 
@@ -277,6 +281,7 @@ config_init(void)
 	config.wired_passed		= 1; // default wired device no need login
 	config.parse_checked	= 1; // before parse domain's ip; fping check it
 	config.no_auth 			= 0; // 
+	config.work_mode		= 0;
 	
 	t_https_server *https_server	= (t_https_server *)malloc(sizeof(t_https_server));
 	memset(https_server, 0, sizeof(t_https_server));
@@ -337,6 +342,7 @@ parse_auth_server(FILE * file, const char *filename, int *linenum)
         *msgscriptpathfragment = NULL,
         *pingscriptpathfragment = NULL, *authscriptpathfragment = NULL, line[MAX_BUF], *p1, *p2;
     int http_port, ssl_port, ssl_available, opcode;
+	int connect_timeout;
     t_auth_serv *new, *tmp;
 
     /* Defaults */
@@ -349,6 +355,7 @@ parse_auth_server(FILE * file, const char *filename, int *linenum)
     http_port = DEFAULT_AUTHSERVPORT;
     ssl_port = DEFAULT_AUTHSERVSSLPORT;
     ssl_available = DEFAULT_AUTHSERVSSLAVAILABLE;
+	connect_timeout = 5; // 5 seconds to wait
 
     /* Parsing loop */
     while (memset(line, 0, MAX_BUF) && fgets(line, MAX_BUF - 1, file) && (strchr(line, '}') == NULL)) {
@@ -400,6 +407,9 @@ parse_auth_server(FILE * file, const char *filename, int *linenum)
                 free(path);
                 path = safe_strdup(p2);
                 break;
+			case oAuthServConnectTimeout:
+				connect_timeout = atoi(p2);
+				break;	
             case oAuthServLoginScriptPathFragment:
                 free(loginscriptpathfragment);
                 loginscriptpathfragment = safe_strdup(p2);
@@ -464,6 +474,7 @@ parse_auth_server(FILE * file, const char *filename, int *linenum)
     new->authserv_hostname = host;
     new->authserv_use_ssl = ssl_available;
     new->authserv_path = path;
+	new->authserv_connect_timeout = connect_timeout;
     new->authserv_login_script_path_fragment = loginscriptpathfragment;
     new->authserv_portal_script_path_fragment = portalscriptpathfragment;
     new->authserv_msg_script_path_fragment = msgscriptpathfragment;
@@ -927,6 +938,9 @@ config_read(const char *filename)
 					break;
 				case oGatewayHttpsPort:
 					sscanf(p1, "%hu", &config.https_server->gw_https_port);
+					break;
+				case oWorkMode:
+					sscanf(p1, "%hu", &config.work_mode);
 					break;
 				// <<< liudf added end
                 case oBadOption:
